@@ -1,0 +1,30 @@
+{
+  "predict_command": "predict-shoppers",
+  "input": {
+    "delimiter": ",",
+    "columns": [
+      "Administrative",
+      "Administrative_Duration",
+      "Informational",
+      "Informational_Duration",
+      "ProductRelated",
+      "ProductRelated_Duration",
+      "BounceRates",
+      "ExitRates",
+      "SpecialDay",
+      "Month",
+      "OperatingSystems",
+      "Browser",
+      "Region",
+      "TrafficType",
+      "VisitorType",
+      "Weekend"
+    ]
+  },
+  "output": {
+    "format": "csv",
+    "columns": [
+      "purchase_probability"
+    ]
+  }
+}
