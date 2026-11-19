@@ -1,7 +1,9 @@
 import argparse
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
+import joblib
 import pandas as pd
 from sklearn.metrics import (
     confusion_matrix,
@@ -46,6 +48,7 @@ def train(
     *,
     threshold: float = 0.5,
     diagnose_page_values: bool = False,
+    model_out: Path | None = None,
 ) -> dict:
     if not 0 <= threshold <= 1:
         raise ValueError("Threshold must be between 0 and 1.")
@@ -68,9 +71,11 @@ def train(
     cv = list(training_cv().split(x_train, y_train))
     reports = {}
     diagnostics = {}
+    fitted_models = {}
     for name, search in model_searches(cv).items():
         search.fit(x_train, y_train)
-        probabilities = search.best_estimator_.predict_proba(x_test)[:, 1]
+        fitted_models[name] = search.best_estimator_
+        probabilities = fitted_models[name].predict_proba(x_test)[:, 1]
         reports[name] = {
             "parameters": search.best_params_,
             "cv_pr_auc": search.best_score_,
@@ -90,12 +95,20 @@ def train(
                 "cv_pr_auc_with_page_values": float(diagnostic_scores.mean()),
             }
 
+    selected_model = max(reports, key=lambda name: reports[name]["cv_pr_auc"])
+    if model_out is not None:
+        model_out.parent.mkdir(parents=True, exist_ok=True)
+        with TemporaryDirectory(dir=model_out.parent) as directory:
+            staged = Path(directory) / model_out.name
+            joblib.dump(fitted_models[selected_model], staged, compress=3)
+            staged.replace(model_out)
+
     report = {
         "train_sessions": len(x_train),
         "holdout_sessions": len(x_test),
         "holdout_purchase_rate": float(y_test.mean()),
         "threshold": threshold,
-        "selected_model": max(reports, key=lambda name: reports[name]["cv_pr_auc"]),
+        "selected_model": selected_model,
         "models": reports,
     }
     if diagnostics:
@@ -121,12 +134,18 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Compare the selected hyperparameters with and without PageValues using training CV.",
     )
+    parser.add_argument(
+        "--model-out", type=Path, help="Save the selected fitted pipeline to this path."
+    )
     args = parser.parse_args(argv)
+    if args.model_out is not None and args.model_out.resolve() == args.data.resolve():
+        parser.error("--model-out must differ from the training CSV path")
     try:
         report = train(
             pd.read_csv(args.data),
             threshold=args.threshold,
             diagnose_page_values=args.diagnose_page_values,
+            model_out=args.model_out,
         )
     except (OSError, ValueError) as error:
         parser.error(str(error))

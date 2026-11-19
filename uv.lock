@@ -1550,6 +1550,7 @@ name = "online-shoppers-intention"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "joblib" },
     { name = "pandas" },
     { name = "scikit-learn" },
 ]
@@ -1567,6 +1568,7 @@ notebook = [
 
 [package.metadata]
 requires-dist = [
+    { name = "joblib", specifier = "==1.6.0" },
     { name = "pandas", specifier = "==2.3.3" },
     { name = "scikit-learn", specifier = "==1.7.2" },
 ]

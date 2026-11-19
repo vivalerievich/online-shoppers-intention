@@ -31,16 +31,24 @@ CATEGORICAL_FEATURES = (
 )
 
 
-def split_features_target(
+def select_features(
     sessions: pd.DataFrame, *, include_page_values: bool = False
-) -> tuple[pd.DataFrame, pd.Series]:
+) -> pd.DataFrame:
     columns = [*NUMERIC_FEATURES, *CATEGORICAL_FEATURES]
     if include_page_values:
         columns.append(PAGE_VALUES)
-    missing = set([*columns, TARGET]).difference(sessions.columns)
+    missing = set(columns).difference(sessions.columns)
     if missing:
         raise ValueError(f"Missing required CSV columns: {', '.join(sorted(missing))}")
+    return sessions.loc[:, columns]
 
+
+def split_features_target(
+    sessions: pd.DataFrame, *, include_page_values: bool = False
+) -> tuple[pd.DataFrame, pd.Series]:
+    features = select_features(sessions, include_page_values=include_page_values)
+    if TARGET not in sessions.columns:
+        raise ValueError(f"Missing required CSV columns: {TARGET}")
     target = (
         sessions[TARGET]
         .astype("string")
@@ -50,7 +58,7 @@ def split_features_target(
     )
     if target.isna().any() or target.nunique() != 2:
         raise ValueError("Revenue must contain both purchase and non-purchase labels.")
-    return sessions.loc[:, columns], target.astype(int)
+    return features, target.astype(int)
 
 
 def holdout_indices(target: pd.Series) -> tuple[pd.Index, pd.Index]:

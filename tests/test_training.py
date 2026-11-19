@@ -1,4 +1,5 @@
 import json
+from io import StringIO
 
 import pandas as pd
 import pytest
@@ -13,6 +14,7 @@ from online_shoppers_intention.data import (
     split_features_target,
 )
 from online_shoppers_intention.models import make_preprocessor
+from online_shoppers_intention.predict import main as predict_main
 from online_shoppers_intention.train import main
 
 
@@ -81,15 +83,14 @@ def test_preprocessing_handles_missing_numbers_and_unseen_categories(sessions):
     assert all(PAGE_VALUES not in name for name in preprocessor.get_feature_names_out())
 
 
-def test_cli_trains_from_local_data_and_reports_diagnostic(
-    sessions, tmp_path, monkeypatch, capsys
-):
+def test_train_and_predict_cli_on_local_data(sessions, tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(models, "LOGISTIC_GRID", {"classifier__C": [1.0]})
     monkeypatch.setattr(models, "TREE_GRID", {"classifier__max_depth": [2]})
     csv = tmp_path / "sessions.csv"
     sessions.to_csv(csv, index=False)
+    model_path = tmp_path / "artifacts" / "model.joblib"
 
-    main(["--data", str(csv), "--diagnose-page-values"])
+    main(["--data", str(csv), "--diagnose-page-values", "--model-out", str(model_path)])
 
     report = json.loads(capsys.readouterr().out)
     assert report["train_sessions"] == 48
@@ -99,3 +100,13 @@ def test_cli_trains_from_local_data_and_reports_diagnostic(
         assert model["holdout"]["confusion_matrix"] == [[6, 0], [0, 6]]
         diagnostic = report["page_values_training_cv_diagnostic"][name]
         assert diagnostic["cv_pr_auc_without_page_values"] == model["cv_pr_auc"]
+
+    inference_data = tmp_path / "inference.csv"
+    sessions.iloc[:2].drop(columns=[PAGE_VALUES, TARGET]).to_csv(
+        inference_data, index=False
+    )
+    predict_main(["--model", str(model_path), "--data", str(inference_data)])
+    predictions = pd.read_csv(StringIO(capsys.readouterr().out))
+    assert list(predictions) == ["purchase_probability"]
+    first, second = predictions["purchase_probability"]
+    assert 0 <= first < 0.5 < second <= 1

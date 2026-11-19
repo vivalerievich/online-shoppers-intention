@@ -8,5 +8,7 @@ __pycache__/
 dist/
 build/
 data/
+artifacts/
 *.csv
+*.joblib
 *.zip

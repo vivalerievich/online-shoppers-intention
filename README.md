@@ -1,6 +1,24 @@
 # Online Shoppers Purchasing Intention
 
-Бинарная классификация визитов интернет-магазина. Модели оценивают вероятность покупки к концу визита (`Revenue`). В наборе UCI 12 330 сессий, из которых 1 908 завершились покупкой (15,5%).
+[![CI](https://github.com/vivalerievich/online-shoppers-intention/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vivalerievich/online-shoppers-intention/actions/workflows/ci.yml)
+
+**Задача.** Оценить вероятность покупки к концу визита в интернет-магазин (`Revenue`). В наборе UCI 12 330 сессий, из которых 1 908 завершились покупкой (15,5%).
+
+**Результат.** Дерево решений получило PR-AUC **0,3892** на отложенной выборке. Площадь рассчитана методом трапеций.
+
+**Главное ограничение.** `PageValues` исключён из модели из-за риска утечки. Качество измерено на агрегатах завершённых визитов, поэтому для скоринга во время визита требуется отдельная оценка на данных, доступных в момент прогноза.
+
+## Готовая модель
+
+Скачайте `online-shoppers-intention.joblib`, `sample-input.csv` и `SHA256SUMS.txt` из [релиза](https://github.com/vivalerievich/online-shoppers-intention/releases/latest) и распакуйте архив исходного кода того же релиза. Поместите три файла в корень распакованного проекта.
+
+```bash
+shasum -a 256 -c SHA256SUMS.txt
+uv sync --locked --no-dev --python 3.14
+uv run --locked --no-dev predict-shoppers --model online-shoppers-intention.joblib --data sample-input.csv
+```
+
+Релиз содержит дерево решений вместе с обученной предобработкой, подогнанной на 9 864 сессиях обучающей части. Для предсказания нужен CSV с 16 признаками из заголовка синтетического `sample-input.csv`. Вывод — CSV со столбцом `purchase_probability` в порядке входных строк. Он содержит оценки вероятности покупки. Рабочий порог зависит от стоимости ошибок. Сохранённый `joblib` следует загружать из доверенного релиза.
 
 ## Запуск
 
@@ -14,9 +32,12 @@ curl --fail --location \
   --output data/online_shoppers_intention.csv
 uv run train-shoppers
 uv run train-shoppers --diagnose-page-values
+uv run train-shoppers --model-out artifacts/online-shoppers-intention.joblib
 ```
 
 CSV можно также скачать со страницы набора, распаковать в `data/` или передать свой путь через `--data`. CLI печатает JSON с результатами. Исходные данные исключены из Git. [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/468/online%2Bshoppers%2Bpurchasing%2Bintention%2Bdataset)
+
+Источник данных — C. Sakar и Y. Kastro (2018). [DOI 10.24432/C5F88Q](https://doi.org/10.24432/C5F88Q), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ```bash
 uv run ruff check .
